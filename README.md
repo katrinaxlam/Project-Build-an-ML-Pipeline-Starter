@@ -15,6 +15,7 @@ In this project you will build such a pipeline.
   * [The configuration](#the-configuration)
   * [Running the entire pipeline or just a selection of steps](#Running-the-entire-pipeline-or-just-a-selection-of-steps)
   * [Pre-existing components](#pre-existing-components)
+  * [Link to public project](#link-to-public-project)
 
 ## Preliminary steps
 
@@ -172,6 +173,10 @@ If you see the any error while running the command:
 ```
 > mlflow run .
 ```
+
+### Link to public project
+
+https://wandb.ai/katrinaxbear-western-governors-university/nyc_airbnb/overview
 
 Please, make sure all steps are using **the same** python version and that you have **conda installed**. Additionally, *mlflow* and *wandb* packages are crucial and should have the same version.
 
