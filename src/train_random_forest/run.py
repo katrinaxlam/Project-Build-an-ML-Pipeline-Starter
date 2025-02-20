@@ -23,6 +23,8 @@ import wandb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.pipeline import Pipeline, make_pipeline
+from mlflow.models.signature import infer_signature
+
 
 
 def delta_date_feature(dates):
@@ -53,6 +55,7 @@ def go(args):
 
     # Use run.use_artifact(...).file() to get the train and validation artifact
     # and save the returned path in train_local_pat
+    logger.info("Downloading training set artifact")
     trainval_local_path = run.use_artifact(args.trainval_artifact).file()
    
     X = pd.read_csv(trainval_local_path)
@@ -71,10 +74,8 @@ def go(args):
     # Then fit it to the X_train, y_train data
     logger.info("Fitting")
 
-    ######################################
-    # Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
-    # YOUR CODE HERE
-    ######################################
+    ## Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
+    sk_pipe.fit(X_train, y_train)
 
     # Compute r2 and MAE
     logger.info("Scoring")
@@ -92,12 +93,22 @@ def go(args):
     if os.path.exists("random_forest_dir"):
         shutil.rmtree("random_forest_dir")
 
-    ######################################
-    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
-    # HINT: use mlflow.sklearn.save_model
+    export_path = "random_forest_dir"
+
+    # # Ensure the data is properly formatted before inference
+    X_val = X_val.apply(pd.to_numeric, errors='coerce')  # Convert all columns to numeric, set invalid parsing to NaN
+    X_val = X_val.dropna()
+    y_pred = y_pred.astype('float64')  
+    # Ensure predictions are also of the same type
+
+    signature = infer_signature(X_val, y_pred)
+    
     mlflow.sklearn.save_model(
-        # YOUR CODE HERE
-        input_example = X_train.iloc[:5]
+        sk_model = sk_pipe,
+        path = export_path,
+        serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+        signature=signature,
+        input_example=X_val.iloc[:5]
     )
     ######################################
 
@@ -106,10 +117,10 @@ def go(args):
     artifact = wandb.Artifact(
         args.output_artifact,
         type = 'model_export',
-        description = 'Trained ranfom forest artifact',
+        description = 'Trained pipeline artifact',
         metadata = rf_config
     )
-    artifact.add_dir('random_forest_dir')
+    artifact.add_dir(export_path)
     run.log_artifact(artifact)
 
     # Plot feature importance
@@ -119,7 +130,7 @@ def go(args):
     # Here we save variable r_squared under the "r2" key
     run.summary['r2'] = r_squared
     # Now save the variable mae under the key "mae".
-    # YOUR CODE HERE
+    run.summary['mae'] = mae
     ######################################
 
     # Upload to W&B the feture importance visualization
@@ -163,6 +174,8 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     # 2 - A OneHotEncoder() step to encode the variable
     non_ordinal_categorical_preproc = make_pipeline(
         # YOUR CODE HERE
+        SimpleImputer(strategy="most_frequent"),
+        OneHotEncoder()
     )
     ######################################
 
@@ -215,7 +228,7 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     processed_features = ordinal_categorical + non_ordinal_categorical + zero_imputed + ["last_review", "name"]
 
     # Create random forest
-    random_forest = RandomForestRegressor(**rf_config)
+    random_Forest = RandomForestRegressor(**rf_config)
 
     ######################################
     # Create the inference pipeline. The pipeline must have 2 steps: 
@@ -226,6 +239,8 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     sk_pipe = Pipeline(
         steps =[
         # YOUR CODE HERE
+            ("preprocessor", preprocessor),
+            ("random_forest", random_Forest)
         ]
     )
 
